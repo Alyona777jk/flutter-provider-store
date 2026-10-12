@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import '../services/fake_api.dart';
 
+enum PaymentMethod { card, cash }
+
 class CartItem {
   final Product product;
   int quantity;
@@ -13,14 +15,21 @@ class CartModel extends ChangeNotifier {
   final Map<String, CartItem> _items = {};
   bool _isOrdering = false;
   String? _orderError;
+  PaymentMethod _selectedPaymentMethod = PaymentMethod.card;
 
   Map<String, CartItem> get items => {..._items};
   bool get isOrdering => _isOrdering;
   String? get orderError => _orderError;
+  PaymentMethod get selectedPaymentMethod => _selectedPaymentMethod;
 
   int get totalItemCount => _items.values.fold(0, (sum, item) => sum + item.quantity);
 
   double get totalPrice => _items.values.fold(0.0, (sum, item) => sum + item.product.price * item.quantity);
+
+  void setPaymentMethod(PaymentMethod method) {
+    _selectedPaymentMethod = method;
+    notifyListeners();
+  }
 
   void addItem(Product product) {
     if (_items.containsKey(product.id)) {
@@ -54,7 +63,8 @@ class CartModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _api.checkout();
+      final methodTitle = _selectedPaymentMethod == PaymentMethod.card ? 'Карткою' : 'Готівкою';
+      await _api.checkout(methodTitle);
       _items.clear();
       _isOrdering = false;
       notifyListeners();

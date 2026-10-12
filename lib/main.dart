@@ -35,7 +35,6 @@ class CartBadgeIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // В оптимізованій версії використовуємо Selector
     return Selector<CartModel, int>(
       selector: (_, cart) => cart.totalItemCount,
       builder: (context, count, child) {
@@ -70,10 +69,10 @@ class CatalogScreen extends StatelessWidget {
         title: const Text('Каталог товарів'),
         actions: const [CartBadgeIconButton()],
       ),
-      body: Column(
+      body: const Column(
         children: [
-          const CategoryFilterWidget(),
-          Expanded(child: const ProductListWidget()),
+          CategoryFilterWidget(),
+          Expanded(child: ProductListWidget()),
         ],
       ),
     );
@@ -85,7 +84,6 @@ class CategoryFilterWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Використання context.watch для отримання обраної категорії
     final catalog = context.watch<CatalogModel>();
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -99,7 +97,6 @@ class CategoryFilterWidget extends StatelessWidget {
               label: Text(category),
               selected: isSelected,
               onSelected: (_) {
-                // Використання context.read у колбеку
                 context.read<CatalogModel>().setCategory(category);
               },
             ),
@@ -149,6 +146,7 @@ class ProductListWidget extends StatelessWidget {
   }
 }
 
+// Картковий віджет товару
 class ProductTile extends StatelessWidget {
   final Product product;
   const ProductTile({super.key, required this.product});
@@ -156,17 +154,99 @@ class ProductTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     debugPrint('[BUILD] ProductTile (${product.title}) build() called');
-    return ListTile(
-      title: Text(product.title),
-      subtitle: Text('${product.price} грн | ${product.category}'),
-      trailing: ElevatedButton(
-        onPressed: () {
-          context.read<CartModel>().addItem(product);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${product.title} додано до кошика!'), duration: const Duration(seconds: 1)),
-          );
-        },
-        child: const Text('До кошика'),
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.grey[200],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  product.imageUrl,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Center(
+                      child: Icon(Icons.broken_image, size: 40, color: Colors.grey),
+                    );
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.title,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    product.description,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${product.price.toStringAsFixed(2)} грн',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context).primaryColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.add_shopping_cart),
+                        color: Theme.of(context).primaryColor,
+                        onPressed: () {
+                          context.read<CartModel>().addItem(product);
+                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${product.title} додано!'),
+                              duration: const Duration(seconds: 1),
+                              action: SnackBarAction(
+                                label: 'В кошик',
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const CartScreen()),
+                                  );
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -194,6 +274,13 @@ class CartScreen extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final item = items[index];
                     return ListTile(
+                      leading: Image.network(
+                        item.product.imageUrl,
+                        width: 50,
+                        height: 50,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => const Icon(Icons.image),
+                      ),
                       title: Text(item.product.title),
                       subtitle: Text('${item.product.price} грн x ${item.quantity}'),
                       trailing: Row(
@@ -218,12 +305,44 @@ class CartScreen extends StatelessWidget {
                   },
                 ),
               ),
+              const Divider(),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Спосіб оплати:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: SegmentedButton<PaymentMethod>(
+                        segments: const [
+                          ButtonSegment<PaymentMethod>(
+                            value: PaymentMethod.card,
+                            label: Text('Карткою'),
+                            icon: Icon(Icons.credit_card),
+                          ),
+                          ButtonSegment<PaymentMethod>(
+                            value: PaymentMethod.cash,
+                            label: Text('Готівкою'),
+                            icon: Icon(Icons.payments),
+                          ),
+                        ],
+                        selected: {cart.selectedPaymentMethod},
+                        onSelectionChanged: (Set<PaymentMethod> newSelection) {
+                          context.read<CartModel>().setPaymentMethod(newSelection.first);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
                     if (cart.orderError != null)
-                      Text('Помилка замовлення: ${cart.orderError}', style: const TextStyle(color: Colors.red)),
+                      Text('Помилка: ${cart.orderError}', style: const TextStyle(color: Colors.red)),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
